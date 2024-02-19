@@ -1,10 +1,12 @@
+import math
+import sys
+import time
 import argparse
 
 
 # -------------------------------------------------------------- #
 # ---------------------- ARGUMENTS PARSER ---------------------- #
 # -------------------------------------------------------------- #
-
 parser = argparse.ArgumentParser(
     description="""Compression algorithm LZ77."""
 )
@@ -15,9 +17,9 @@ parser.add_argument("-s", "--string", help="""If used, then expects the input to
 The '-o' argument must be specified.""", action="store_true", default=False)
 parser.add_argument("-d", "--decompress", help="If used, then the input is expected to be a compressed file_path/string.",
                     action="store_true", default=False)
-parser.add_argument("-t", "--test", help="For help during debugging.", action="store_true", 
+parser.add_argument("-t", "--test", help="For help during debugging.", action="store_true",
                     default=False)
-parser.add_argument("-w", "--window", help="Specify the window size, cannot be less then 4 and more than 127.", 
+parser.add_argument("-w", "--window", help="Specify the window size, cannot be less then 4 and more than 127.",
                     default=None)
 args = parser.parse_args()
 # -------------------------------------------------------------- #
@@ -42,7 +44,7 @@ LARGEST_NUMBER = 0
 MAX_WINDOW = 127
 
 
-def encode(string, look_ahead=15, back_search=15):
+def encode(data, look_ahead=15, back_search=15):
     """
     used image from:
      https://codereview.stackexchange.com/questions/233865/lz77-compression-algorithm-general-code-efficiency
@@ -53,7 +55,7 @@ def encode(string, look_ahead=15, back_search=15):
 
     result = []
 
-    end = len(string)
+    end = len(data)
     i = 0
     start = time.time()
     one_percent = end / 100
@@ -63,13 +65,13 @@ def encode(string, look_ahead=15, back_search=15):
         percent = (i / one_percent) + 1
         print(f"({elapsed:.2f}s) {percent:.2f}%", end="\r")
 
-        char = string[i]
+        byte = data[i]
         look_back = 0
         length = 0
 
         if DEBUG:
-            back_buff = string[i-back_search:i]
-            ahead_buff = string[i:i+look_ahead]
+            back_buff = data[i - back_search:i]
+            ahead_buff = data[i:i + look_ahead]
 
         # for each char in the back_search_buffer
         for j in range(max(i-back_search, 0), i):
@@ -77,31 +79,31 @@ def encode(string, look_ahead=15, back_search=15):
             curr_search_idx = j
 
             if DEBUG:
-                string_j = string[j]
-                string_j_len = string[j + curr_len]
-                string_i_len = string[i + curr_len]
+                string_j = data[j]
+                string_j_len = data[j + curr_len]
+                string_i_len = data[i + curr_len]
 
             # get the length of current match
             while ((i + curr_len < end) and
                    (curr_len < look_ahead) and
                    (curr_search_idx < i) and
-                   (string[j + curr_len] == string[i + curr_len])):
+                   (data[j + curr_len] == data[i + curr_len])):
                 curr_len += 1
                 curr_search_idx += 1
 
             if curr_len > length:
                 look_back = i - j
                 length = curr_len
-                char = string[min(i + length, end-1)]
+                byte = data[min(i + length, end - 1)]
 
                 # special case scenario if the last match is perfectly at the end, so no next char exists
                 if i + length == end:
-                    char = ''
+                    byte = 0
 
         LARGEST_NUMBER = max(LARGEST_NUMBER, length)
         LARGEST_NUMBER = max(LARGEST_NUMBER, look_back)
 
-        result.append(Block(look_back, length, char))
+        result.append(Block(look_back, length, byte))
         i += length+1
     return result
 
@@ -120,6 +122,85 @@ def decode(list_of_blocks):
     return result
 
 
+def to_bin_file(out_file, data: list[Block]):
+    bits_per_symbol = math.log2(LARGEST_NUMBER)
+    if bits_per_symbol % 1:
+        bits_per_symbol += 1
+    bits_per_symbol = int(bits_per_symbol)
+    if DEBUG:
+        print(f"bits_per_symbol={bits_per_symbol}")
+
+    result = [LARGEST_NUMBER]
+    next_byte = 0
+    shift = 0
+    for i, block in enumerate(data):
+        look_ahead = Block(0, 0, 0)
+        if i < len(data)-1:
+            look_ahead = data[i+1]
+
+        # flags to represent progress of current block
+        curr_offset = False
+        curr_length = False
+        curr_byte = False
+        split_rest = 0
+        split_switch = None
+
+        MAX_SHIFT = 7
+        SWITCH_OFFSET = "_offset_"
+        SWITCH_LENGTH = "_length_"
+        SWITCH_BYTE = "_byte_"
+
+        while (not curr_offset) and (not curr_length) and (not curr_byte):
+
+            # if this byte still has space for another value
+            while (MAX_SHIFT - shift) > bits_per_symbol:
+
+                # first check previously split value (can only happen with filling new empty byte)
+                if split_rest:
+                    if split_switch == SWITCH_OFFSET:
+                        next_byte = block.offset << (MAX_SHIFT - (split_rest - 1))
+                        curr_offset = True
+                    elif split_switch == SWITCH_LENGTH:
+                        next_byte = block.length << (MAX_SHIFT - (split_rest - 1))
+                        curr_length = True
+                    else:
+                        next_byte = block.byte << (MAX_SHIFT - (split_rest - 1))
+                        curr_byte = True
+                    shift = split_rest
+                    split_rest = 0
+                    split_switch = None
+
+                if not curr_offset:
+                    next_byte = next_byte | block.offset << bits_per_symbol
+                    curr_offset = True
+                    shift += bits_per_symbol
+
+                elif not curr_length:
+                    next_byte = next_byte | block.length << bits_per_symbol
+                    curr_length = True
+                    shift += bits_per_symbol
+
+                # this only happens if offset and length were previously recorded and the byte has it's own byte
+                elif (not curr_byte) and (shift == 0):
+                    next_byte = block.byte
+                    curr_byte = True
+                    shift += MAX_SHIFT
+
+            # now the byte cannot store the next full information
+            free_bits = MAX_SHIFT - shift + 1
+            free_shift = free_bits - 1
+            if free_bits:
+                # split value
+                if not curr_offset:
+                    next_byte = next_byte | (block.offset >> (bits_per_symbol-free_bits))
+
+
+            else:
+                result.append(next_byte)
+                next_byte = 0
+
+
+
 def test_decode():
 
     encoded = [Block(0, 0, 'a'),
@@ -136,16 +217,57 @@ def test_decode():
 
 def main():
     test_str = 'abracadabra'
-    print('Original:', test_str)
-    encoded = encode(test_str)
-    print('Encoded:', encoded)
+    in_f = "i.txt"
+    out_f = "i.lz77"
+    with open(in_f, "r") as f:
+        test_str = f.read()
+    print(f'Original size: {sys.getsizeof(test_str)}B')
+    start = time.time()
+    encoded = encode(test_str, look_ahead=30, back_search=30)
+    end = time.time()
+    elapsed = end - start
+    print(f'({elapsed:.2f}s) Encoded size: {sys.getsizeof(encoded)}B')
+    with open(out_f, "w") as f:
+        for block in encoded:
+            f.write(f"{block}\n")
 
     decoded = decode(encoded)
-    print('Decoded:', decoded)
-    print('Original == Decoded:', test_str == decoded)
+    print(f'Decoded size: {sys.getsizeof(decoded)}B')
+    print(f'Original == Decoded: {test_str == decoded}')
+    with open("decoded.txt", "w") as f:
+        f.write(decoded)
+
+
+def test():
+    test_str = 'abracadabradabracadabrad'
+    print(f'Original size: {sys.getsizeof(test_str)}B')
+    start = time.time()
+    encoded = encode(test_str, look_ahead=5, back_search=7)
+    end = time.time()
+    elapsed = end - start
+    print(f'({elapsed:.2f}s) Encoded size: {sys.getsizeof(encoded)}B')
+    for b in encoded:
+        print(b)
+
+    decoded = decode(encoded)
+    print(f'Decoded size: {sys.getsizeof(decoded)}B')
+    print(f'Original == Decoded: {test_str == decoded}')
 
 
 if __name__ == '__main__':
     DEBUG = args.test
     # test_decode()
-    main()
+    # main()
+    test()
+    # to_bin_file("a", "a")
+
+    with open("i.txt", "rb") as f:
+        data = f.read()
+
+    print(type(data))
+    print(data[0])
+    print(type(data[0]))
+    print(data[1])
+    print(data[2])
+
+
