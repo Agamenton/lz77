@@ -24,14 +24,14 @@ args = parser.parse_args()
 
 
 class Block:
-    def __init__(self, offset, length, char=''):
+    def __init__(self, offset, length, byte=0):
         self.offset = offset
         self.length = length
-        self.char = char
+        self.byte = byte
 
     def __str__(self):
-        if self.char:
-            return f'({self.offset}, {self.length}, {self.char})'
+        if self.byte:
+            return f'({self.offset}, {self.length}, {self.byte})'
         return f'({self.offset}, {self.length})'
 
     def __repr__(self):
@@ -110,13 +110,13 @@ def decode(list_of_blocks):
     result = ''
     for block in list_of_blocks:
         if block.length == 0:
-            result += block.char
+            result += block.byte
         else:
             start = len(result) - block.offset
             end = start + block.length
             result += result[start:end]
-            if block.char:
-                result += block.char
+            if block.byte:
+                result += block.byte
     return result
 
 
