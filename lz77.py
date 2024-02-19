@@ -1,3 +1,23 @@
+import argparse
+
+
+# -------------------------------------------------------------- #
+# ---------------------- ARGUMENTS PARSER ---------------------- #
+# -------------------------------------------------------------- #
+parser = argparse.ArgumentParser(
+    description="""Compression algorithm LZ77."""
+)
+parser.add_argument("input", nargs="?", default=None)
+parser.add_argument("-o", "--output", help="Specify output file name/path, otherwise [input].lz77 will be used.",
+                    default=None)
+parser.add_argument("-s", "--string", help="""If used, then expects the input to be a string and not a filepath and the string will be compressed.
+The '-o' argument must be specified.""", action="store_true", default=False)
+parser.add_argument("-d", "--decompress", help="If used, then the input is expected to be a compressed file_path/string.",
+                    action="store_true", default=False)
+parser.add_argument("-t", "--test", help="For help during debugging.", action="store_true", default=False)
+args = parser.parse_args()
+# -------------------------------------------------------------- #
+
 
 class Block:
     def __init__(self, offset, length, char=''):
@@ -104,5 +124,6 @@ def main():
 
 
 if __name__ == '__main__':
+    DEBUG = args.test
     # test_decode()
     main()
