@@ -38,11 +38,19 @@ class Block:
         return str(self)
 
 
-def my_encode(string, look_ahead=15, back_search=15):
+LARGEST_NUMBER = 0
+MAX_WINDOW = 127
+
+
+def encode(string, look_ahead=15, back_search=15):
     """
     used image from:
      https://codereview.stackexchange.com/questions/233865/lz77-compression-algorithm-general-code-efficiency
     """
+    global LARGEST_NUMBER
+    look_ahead = min(look_ahead, MAX_WINDOW)
+    back_search = min(back_search, MAX_WINDOW)
+
     result = []
 
     end = len(string)
@@ -89,6 +97,9 @@ def my_encode(string, look_ahead=15, back_search=15):
                 # special case scenario if the last match is perfectly at the end, so no next char exists
                 if i + length == end:
                     char = ''
+
+        LARGEST_NUMBER = max(LARGEST_NUMBER, length)
+        LARGEST_NUMBER = max(LARGEST_NUMBER, look_back)
 
         result.append(Block(look_back, length, char))
         i += length+1
