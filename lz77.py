@@ -34,7 +34,7 @@ class Block:
         return str(self)
 
 
-def encode(string, look_ahead=15, back_search=15):
+def my_encode(string, look_ahead=15, back_search=15):
     """
     used image from:
      https://codereview.stackexchange.com/questions/233865/lz77-compression-algorithm-general-code-efficiency
@@ -43,7 +43,14 @@ def encode(string, look_ahead=15, back_search=15):
 
     end = len(string)
     i = 0
+    start = time.time()
+    one_percent = end / 100
     while i < end:
+        now = time.time()
+        elapsed = now-start
+        percent = (i / one_percent) + 1
+        print(f"({elapsed:.2f}s) {percent:.2f}%", end="\r")
+
         char = string[i]
         look_back = 0
         length = 0
