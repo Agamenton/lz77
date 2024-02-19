@@ -14,23 +14,53 @@ class Block:
         return str(self)
 
 
-def encode(string):
+def encode(string, look_ahead=15, back_search=15):
+    """
+    used image from:
+     https://codereview.stackexchange.com/questions/233865/lz77-compression-algorithm-general-code-efficiency
+    """
     result = []
+
+    end = len(string)
     i = 0
-    while i < len(string):
-        offset = 0
-        length = 0
+    while i < end:
         char = string[i]
-        for j in range(i):
-            k = 0
-            while i + k < len(string) and string[j + k] == string[i + k]:
-                k += 1
-            if k > length:
-                offset = i - j
-                length = k
-                char = ''
-        result.append(Block(offset, length, char))
-        i += max(1, length)
+        look_back = 0
+        length = 0
+
+        if DEBUG:
+            back_buff = string[i-back_search:i]
+            ahead_buff = string[i:i+look_ahead]
+
+        # for each char in the back_search_buffer
+        for j in range(max(i-back_search, 0), i):
+            curr_len = 0
+            curr_search_idx = j
+
+            if DEBUG:
+                string_j = string[j]
+                string_j_len = string[j + curr_len]
+                string_i_len = string[i + curr_len]
+
+            # get the length of current match
+            while ((i + curr_len < end) and
+                   (curr_len < look_ahead) and
+                   (curr_search_idx < i) and
+                   (string[j + curr_len] == string[i + curr_len])):
+                curr_len += 1
+                curr_search_idx += 1
+
+            if curr_len > length:
+                look_back = i - j
+                length = curr_len
+                char = string[min(i + length, end-1)]
+
+                # special case scenario if the last match is perfectly at the end, so no next char exists
+                if i + length == end:
+                    char = ''
+
+        result.append(Block(look_back, length, char))
+        i += length+1
     return result
 
 
