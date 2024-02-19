@@ -4,6 +4,7 @@ import argparse
 # -------------------------------------------------------------- #
 # ---------------------- ARGUMENTS PARSER ---------------------- #
 # -------------------------------------------------------------- #
+
 parser = argparse.ArgumentParser(
     description="""Compression algorithm LZ77."""
 )
@@ -14,7 +15,10 @@ parser.add_argument("-s", "--string", help="""If used, then expects the input to
 The '-o' argument must be specified.""", action="store_true", default=False)
 parser.add_argument("-d", "--decompress", help="If used, then the input is expected to be a compressed file_path/string.",
                     action="store_true", default=False)
-parser.add_argument("-t", "--test", help="For help during debugging.", action="store_true", default=False)
+parser.add_argument("-t", "--test", help="For help during debugging.", action="store_true", 
+                    default=False)
+parser.add_argument("-w", "--window", help="Specify the window size, cannot be less then 4 and more than 127.", 
+                    default=None)
 args = parser.parse_args()
 # -------------------------------------------------------------- #
 
