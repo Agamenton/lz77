@@ -44,14 +44,20 @@ LARGEST_NUMBER = 0
 MAX_WINDOW = 127
 
 
-def encode(data, look_ahead=15, back_search=15):
+def encode(data, look_ahead=MAX_WINDOW/2, back_search=MAX_WINDOW/2):
     """
     used image from:
      https://codereview.stackexchange.com/questions/233865/lz77-compression-algorithm-general-code-efficiency
     """
-    global LARGEST_NUMBER
-    look_ahead = min(look_ahead, MAX_WINDOW)
-    back_search = min(back_search, MAX_WINDOW)
+    if look_ahead % 2:
+        look_ahead += 1
+    if look_ahead > MAX_WINDOW/2:
+        look_ahead = MAX_WINDOW/2
+
+    if back_search % 2:
+        back_search += 1
+    if back_search > MAX_WINDOW/2:
+        back_search = MAX_WINDOW/2
 
     result = []
 
@@ -66,7 +72,7 @@ def encode(data, look_ahead=15, back_search=15):
         print(f"({elapsed:.2f}s) {percent:.2f}%", end="\r")
 
         byte = data[i]
-        look_back = 0
+        offset = 0
         length = 0
 
         if DEBUG:
@@ -92,7 +98,7 @@ def encode(data, look_ahead=15, back_search=15):
                 curr_search_idx += 1
 
             if curr_len > length:
-                look_back = i - j
+                offset = i - j
                 length = curr_len
                 byte = data[min(i + length, end - 1)]
 
@@ -100,26 +106,39 @@ def encode(data, look_ahead=15, back_search=15):
                 if i + length == end:
                     byte = 0
 
-        LARGEST_NUMBER = max(LARGEST_NUMBER, length)
-        LARGEST_NUMBER = max(LARGEST_NUMBER, look_back)
-
-        result.append(Block(look_back, length, byte))
+        result.append(offset)
+        result.append(length)
+        result.append(byte)
         i += length+1
-    return result
+    return bytes(result)
 
 
-def decode(list_of_blocks):
-    result = ''
-    for block in list_of_blocks:
-        if block.length == 0:
-            result += block.byte
+def decode(list_of_bytes: bytes):
+    S_OFFSET = 0
+    S_LENGTH = 1
+    S_BYTE = 2
+
+    result = []
+    state = S_OFFSET
+
+    offset = 0
+    length = 0
+    for byte in list_of_bytes:
+        if state == S_OFFSET:
+            offset = byte
+            state = S_LENGTH
+        elif state == S_LENGTH:
+            length = byte
+            state = S_BYTE
         else:
-            start = len(result) - block.offset
-            end = start + block.length
-            result += result[start:end]
-            if block.byte:
-                result += block.byte
-    return result
+            if (not length == 0) and (not offset == 0):
+                start = len(result) - offset
+                end = start + length
+                result.extend(result[start:end])
+            result.append(byte)
+            state = S_OFFSET
+
+    return bytes(result[:-1])   # ignore last byte because my encoding always puts \x00 at end
 
 
 def to_bin_file(out_file, data: list[Block]):
@@ -202,39 +221,40 @@ def to_bin_file(out_file, data: list[Block]):
 
 
 def test_decode():
-
-    encoded = [Block(0, 0, 'a'),
-               Block(0, 0, 'b'),
-               Block(1, 1),
-               Block(1, 1),
-               Block(4, 3)]
-    decoded = decode(encoded)
-    expected = 'abbbabb'
-    print('Decoded:', decoded)
-    print('Expected:', expected)
-    print(f'Test decode success? {decoded == expected}')
+    expected = [0,1,1,2,1,1,2,2]
+    encoded = [0,0,0,
+               0,0,1,
+               1,1,2,
+               3,3,2]
+    decoded = decode(bytes(encoded))
+    for d in decoded:
+        print(int(d))
+    print(decoded == bytes(expected))
 
 
 def main():
+    # ----- INPUT ------
     test_str = 'abracadabra'
     in_f = "i.txt"
-    out_f = "i.lz77"
-    with open(in_f, "r") as f:
+    out_f = f"{in_f}.lz77"
+    with open(in_f, "rb") as f:
         test_str = f.read()
     print(f'Original size: {sys.getsizeof(test_str)}B')
+
+    # ----- ENCODE ------
     start = time.time()
     encoded = encode(test_str, look_ahead=30, back_search=30)
     end = time.time()
     elapsed = end - start
     print(f'({elapsed:.2f}s) Encoded size: {sys.getsizeof(encoded)}B')
-    with open(out_f, "w") as f:
-        for block in encoded:
-            f.write(f"{block}\n")
+    with open(out_f, "wb") as f:
+        f.write(encoded)
 
+    # ----- DECODE ------
     decoded = decode(encoded)
     print(f'Decoded size: {sys.getsizeof(decoded)}B')
     print(f'Original == Decoded: {test_str == decoded}')
-    with open("decoded.txt", "w") as f:
+    with open("decoded.txt", "wb") as f:
         f.write(decoded)
 
 
@@ -257,17 +277,7 @@ def test():
 if __name__ == '__main__':
     DEBUG = args.test
     # test_decode()
-    # main()
-    test()
-    # to_bin_file("a", "a")
-
-    with open("i.txt", "rb") as f:
-        data = f.read()
-
-    print(type(data))
-    print(data[0])
-    print(type(data[0]))
-    print(data[1])
-    print(data[2])
+    main()
+    # test()
 
 
