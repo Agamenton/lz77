@@ -170,6 +170,7 @@ int main(int argc, char** argv)
         byte length = 0;
         byte data = 0;
         bool debug = FALSE;
+		bool real_data = TRUE;	// FALSE only used in one special case
         // for each currently read symbol
         while (read_idx < file_size)
         {
@@ -207,6 +208,7 @@ int main(int argc, char** argv)
                     if(read_idx + length == file_size)
                     {
                         data = 0;
+						real_data = FALSE;
                     }
                 }
                 j += 1;
@@ -229,7 +231,10 @@ int main(int argc, char** argv)
 
             output[output_idx++] = offset;
             output[output_idx++] = length;
-            output[output_idx++] = data;
+			if (real_data)
+			{
+				output[output_idx++] = data;				
+			}
 
             read_idx += length + 1;
         }
