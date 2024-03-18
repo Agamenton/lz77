@@ -23,6 +23,11 @@
 
 typedef unsigned char byte;
 typedef byte bool;
+typedef enum {
+	S_OFFSET,
+	S_LENGTH,
+	S_DATA,
+} decode_state;
 
 
 void print_args_help();
@@ -218,7 +223,8 @@ int main(int argc, char** argv)
             if(output_idx > output_size - 3)
             {
                 output_alloc_cnt += 1;
-                output = (byte*)realloc(output, output_size*output_alloc_cnt);
+				output_size = output_size*output_alloc_cnt;
+                output = (byte*)realloc(output, output_size);
                 if(output == NULL)
                 {
                     printf("|ERR| Failed to re-allocate (output) memory for: %zu Bytes\n", output_size*output_alloc_cnt);
@@ -241,7 +247,7 @@ int main(int argc, char** argv)
 
         end_time = clock();
         elapsed_time = ((double) (end_time - start_time)) / CLOCKS_PER_SEC;
-        printf("Time elapsed: %f seconds\n", elapsed_time);
+        printf("Time elapsed: %0.2f seconds\n", elapsed_time);
         printf("Encoded size: %zu", output_idx);
 
         output_f = fopen(output_p, "wb");
@@ -259,15 +265,106 @@ int main(int argc, char** argv)
     // DECODE / DECOMPRESS
     else
     {
-        //byte offset = 0;
-        //byte length = 0;
-        //byte data = 0;
-        //for(long i = 0; i < file_size; i++)
-        //{
-        //    
-        //}
+		clock_t start_time, end_time;
+        double elapsed_time;
 
+        start_time = clock();
 
+        printf("Original size: %zu\n", file_size);
+        // Create path for output file
+        output_p = "decoded.txt";	// TODO: input name minus extension (if extension == .lz77)
+		
+		decode_state state = S_OFFSET;
+        byte offset = 0;
+        byte length = 0;
+        byte data = 0;
+		size_t offset_start = 0;
+		size_t offset_end = 0;
+		
+		size_t output_idx = 0;
+		size_t read_idx = 0;
+		while (read_idx < file_size)
+		{
+			if (!(read_idx % 1000))
+			{
+				printf("read_idx = %zu\r", read_idx);
+			}
+			byte read = input[read_idx];
+			switch(state)
+			{
+				case S_OFFSET:
+					offset = read;
+					state = S_LENGTH;
+					break;
+				case S_LENGTH:
+					length = read;
+					state = S_DATA;
+					break;
+				case S_DATA:
+					// if needed, re-alloc output data array
+					if(output_idx > output_size - length - 1)
+					{
+						output_alloc_cnt += 1;
+						output_size = output_size*output_alloc_cnt;
+						output = (byte*)realloc(output, output_size);
+						printf("realloced\n");
+						if(output == NULL)
+						{
+							printf("|ERR| Failed to re-allocate (output) memory for: %zu Bytes\n", output_size*output_alloc_cnt);
+							free(input);
+							free(output);
+							free(output_p);
+							return 1;
+						}
+					}
+					
+					// if length and offset aren't 0 then append previous data
+					if ((length != 0) && (offset != 0))
+					{
+						offset_start = output_idx - offset;	// DEV-NOTE: might be +1
+						offset_end = offset_start + length;
+						for (size_t i = offset_start; i < offset_end; i++)
+						{
+							output[output_idx++] = output[i];
+						}
+						output[output_idx++] = read;
+					}
+					length = 0;
+					offset = 0;
+					state = S_OFFSET;					
+					break;					
+			}
+			read_idx++;
+		}
+		printf("\n");
+		
+		// special case when the last byte isn't available (because encoding ended with a pattern)
+		if ((length != 0) && (offset != 0))
+		{
+			offset_start = output_idx - offset;	// DEV-NOTE: might be +1
+			offset_end = offset_start + length;
+			for (size_t i = offset_start; i < offset_end; i++)
+			{
+				output[output_idx++] = output[i];
+			}
+		}
+		
+        end_time = clock();
+        elapsed_time = ((double) (end_time - start_time)) / CLOCKS_PER_SEC;
+        printf("Time elapsed: %0.2f seconds\n", elapsed_time);
+        printf("Decoded size: %zu", output_idx);
+		
+		output_f = fopen(output_p, "wb");
+        if(output_f == NULL)
+        {
+            printf("|ERR| Failed to open/create output file: %s\n", output_p);
+            free(input);
+            free(output);
+            free(output_p);
+            return 1;
+        }
+
+        fwrite(output, 1, output_idx, output_f);
     }
 
     free(input);
