@@ -4,9 +4,6 @@
 #include <time.h>
 
 
-#define max(a,b) (((a) > (b)) ? (a) : (b))
-#define min(a,b) (((a) < (b)) ? (a) : (b))
-
 
 #define ARG_COUNT 3
 #define ARG_COMPRESS "-c"
@@ -21,7 +18,7 @@
 #define MAX_WINDOW 510
 
 
-typedef unsigned char byte;
+typedef unsigned char 	byte;
 typedef byte bool;
 typedef enum {
 	S_OFFSET,
@@ -29,7 +26,8 @@ typedef enum {
 	S_DATA,
 } decode_state;
 
-
+long long max(long long a, long long b);
+long long min(long long a, long long b);
 void print_args_help();
 
 
@@ -164,7 +162,7 @@ int main(int argc, char** argv)
 
         
         int look_ahead = (int)(window_size / 2);    
-        int back_search = (int)(window_size / 2);
+        size_t back_search = (int)(window_size / 2);
         
         long one_percent = (long)(file_size / 100);
         double current_percent = 0;
@@ -182,16 +180,17 @@ int main(int argc, char** argv)
             //current_percent = (double)((double)read_idx / (double)one_percent);
             //printf("(%f/100\%)\r", current_percent);
 
-            data = input[read_idx];
             offset = 0;
             length = 0;
-
-            // continuously check from the start of the back side of the window
-            size_t j = max(read_idx - back_search, 0);
+            data = input[read_idx];
+			
+			long long j = max(read_idx - back_search, 0);
             while(j < read_idx)
             {
                 int current_length = 0;
-                size_t current_search_idx = 0;
+                size_t current_search_idx = j;
+				
+				int test = input[j + current_length] == input[read_idx + current_length] ? 55 : 1;
 
                 // if the current front end of the window is the same pattern as the current back
                 while((read_idx + current_length < file_size) && 
@@ -285,10 +284,7 @@ int main(int argc, char** argv)
 		size_t read_idx = 0;
 		while (read_idx < file_size)
 		{
-			if (!(read_idx % 1000))
-			{
-				printf("read_idx = %zu\r", read_idx);
-			}
+			
 			byte read = input[read_idx];
 			switch(state)
 			{
@@ -327,8 +323,8 @@ int main(int argc, char** argv)
 						{
 							output[output_idx++] = output[i];
 						}
-						output[output_idx++] = read;
 					}
+					output[output_idx++] = read;
 					length = 0;
 					offset = 0;
 					state = S_OFFSET;					
@@ -364,13 +360,13 @@ int main(int argc, char** argv)
             return 1;
         }
 
-        fwrite(output, 1, output_idx, output_f);
+        size_t written = fwrite(output, 1, output_idx, output_f);
     }
 
+    fclose(output_f);
     free(input);
     free(output);
     free(output_p);
-    fclose(output_f);
 
     return 0;
 }
@@ -384,4 +380,24 @@ INPUT:\tRelative or full path to the input file you want to compress/decompress\
 -c:\tChoose this to compress the input file\n\
 -d:\tChoose this to de-compress a .lz77 file\n\
 (you cannot use -c and -d together)");
+}
+
+
+
+long long max(long long a, long long b)
+{
+	if (a > b)
+	{
+		return a;
+	}
+	return b;
+}
+
+long long min(long long a, long long b)
+{
+	if (a < b)
+	{
+		return a;
+	}
+	return b;
 }
