@@ -18,7 +18,10 @@
 #define MAX_WINDOW 510
 
 
-typedef unsigned char 	byte;
+typedef unsigned char		byte;
+typedef unsigned long long	u64;
+typedef long long			s64;
+
 typedef byte bool;
 typedef enum {
 	S_OFFSET,
@@ -26,8 +29,8 @@ typedef enum {
 	S_DATA,
 } decode_state;
 
-long long max(long long a, long long b);
-long long min(long long a, long long b);
+s64 max(s64 a, s64 b);
+s64 min(s64 a, s64 b);
 void print_args_help();
 
 
@@ -91,7 +94,7 @@ int main(int argc, char** argv)
 
     // Get how many bytes needed
     fseek(input_f, 0, SEEK_END);
-    size_t file_size = ftell(input_f);
+    u64 file_size = ftell(input_f);
     fseek(input_f, 0, SEEK_SET);
 
     // allocate bytes for INput
@@ -118,7 +121,7 @@ int main(int argc, char** argv)
 
     // allocate bytes for OUTput
     int output_alloc_cnt = 1;
-    size_t output_size = file_size;
+    u64 output_size = file_size;
     byte* output = (byte*)malloc(output_size);
     if(output == NULL)
     {
@@ -162,10 +165,10 @@ int main(int argc, char** argv)
 
         
         int look_ahead = (int)(window_size / 2);    
-        size_t back_search = (int)(window_size / 2);
+        u64 back_search = (int)(window_size / 2);
         
-        size_t read_idx = 0;
-        size_t output_idx = 0;
+        u64 read_idx = 0;
+        u64 output_idx = 0;
 
         byte offset = 0;
         byte length = 0;
@@ -181,11 +184,11 @@ int main(int argc, char** argv)
             length = 0;
             data = input[read_idx];
 			
-			long long j = max(read_idx - back_search, 0);
+			u64 j = max(read_idx - back_search, 0);
             while(j < read_idx)
             {
                 int current_length = 0;
-                size_t current_search_idx = j;
+                u64 current_search_idx = j;
 
                 // if the current front end of the window is the same pattern as the current back
                 while((read_idx + current_length < file_size) && 
@@ -292,11 +295,11 @@ int main(int argc, char** argv)
         byte offset = 0;
         byte length = 0;
         byte data = 0;
-		size_t offset_start = 0;
-		size_t offset_end = 0;
+		u64 offset_start = 0;
+		u64 offset_end = 0;
 		
-		size_t output_idx = 0;
-		size_t read_idx = 0;
+		u64 output_idx = 0;
+		u64 read_idx = 0;
 		while (read_idx < file_size)
 		{
 			
@@ -334,7 +337,7 @@ int main(int argc, char** argv)
 					{
 						offset_start = output_idx - offset;	// DEV-NOTE: might be +1
 						offset_end = offset_start + length;
-						for (size_t i = offset_start; i < offset_end; i++)
+						for (u64 i = offset_start; i < offset_end; i++)
 						{
 							output[output_idx++] = output[i];
 						}
@@ -354,7 +357,7 @@ int main(int argc, char** argv)
 		{
 			offset_start = output_idx - offset;	// DEV-NOTE: might be +1
 			offset_end = offset_start + length;
-			for (size_t i = offset_start; i < offset_end; i++)
+			for (u64 i = offset_start; i < offset_end; i++)
 			{
 				output[output_idx++] = output[i];
 			}
@@ -399,7 +402,7 @@ INPUT:\tRelative or full path to the input file you want to compress/decompress\
 
 
 
-long long max(long long a, long long b)
+s64 max(s64 a, s64 b)
 {
 	if (a > b)
 	{
@@ -408,7 +411,7 @@ long long max(long long a, long long b)
 	return b;
 }
 
-long long min(long long a, long long b)
+s64 min(s64 a, s64 b)
 {
 	if (a < b)
 	{
