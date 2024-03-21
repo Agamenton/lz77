@@ -42,7 +42,7 @@ int main(int argc, char** argv)
     // always 3 arguments
     if(argc != ARG_COUNT)
     {
-        printf("count\n");
+        printf("count != %d\n", ARG_COUNT);
         print_args_help();
         return 1;
     }
@@ -51,7 +51,7 @@ int main(int argc, char** argv)
     if((strcmp(argv[1], ARG_COMPRESS)==0 && strcmp(argv[2], ARG_DECOMPRESS)==0) || 
     (strcmp(argv[2], ARG_COMPRESS)==0 && strcmp(argv[1], ARG_DECOMPRESS)==0))
     {
-        printf("mix\n");
+        printf("mixed -c and -d\n");
         print_args_help();
         return 1;
     }
@@ -98,7 +98,7 @@ int main(int argc, char** argv)
     byte* input = (byte*)malloc(file_size);
     if(input == NULL)
     {
-        printf("|ERR| Failed to allocate (input) memory for: %zu Bytes\n", file_size);
+        printf("|ERR| Failed to allocate (input) memory for: %llu Bytes\n", file_size);
         fclose(input_f);
         return 1;
     }
@@ -122,7 +122,7 @@ int main(int argc, char** argv)
     byte* output = (byte*)malloc(output_size);
     if(output == NULL)
     {
-        printf("|ERR| Failed to allocate (output) memory for: %zu Bytes\n", output_size);
+        printf("|ERR| Failed to allocate (output) memory for: %llu Bytes\n", output_size);
         free(input);
         return 1;
     }
@@ -154,7 +154,7 @@ int main(int argc, char** argv)
 
         start_time = clock();
 
-        printf("Original size: %zu\n", file_size);
+        printf("Original size: %llu\n", file_size);
         // Create path for output file
         output_p = (char*)malloc(strlen(input_p) + strlen(EXTENSION));
         strcpy(output_p, input_p);
@@ -164,15 +164,12 @@ int main(int argc, char** argv)
         int look_ahead = (int)(window_size / 2);    
         size_t back_search = (int)(window_size / 2);
         
-        long one_percent = (long)(file_size / 100);
-        double current_percent = 0;
         size_t read_idx = 0;
         size_t output_idx = 0;
 
         byte offset = 0;
         byte length = 0;
         byte data = 0;
-        bool debug = FALSE;
 		bool real_data = TRUE;	// FALSE only used in one special case
         // for each currently read symbol
         while (read_idx < file_size)
@@ -189,8 +186,6 @@ int main(int argc, char** argv)
             {
                 int current_length = 0;
                 size_t current_search_idx = j;
-				
-				int test = input[j + current_length] == input[read_idx + current_length] ? 55 : 1;
 
                 // if the current front end of the window is the same pattern as the current back
                 while((read_idx + current_length < file_size) && 
@@ -226,7 +221,7 @@ int main(int argc, char** argv)
                 output = (byte*)realloc(output, output_size);
                 if(output == NULL)
                 {
-                    printf("|ERR| Failed to re-allocate (output) memory for: %zu Bytes\n", output_size*output_alloc_cnt);
+                    printf("|ERR| Failed to re-allocate (output) memory for: %llu Bytes\n", output_size*output_alloc_cnt);
                     free(input);
                     free(output);
                     free(output_p);
@@ -247,7 +242,7 @@ int main(int argc, char** argv)
         end_time = clock();
         elapsed_time = ((double) (end_time - start_time)) / CLOCKS_PER_SEC;
         printf("Time elapsed: %0.2f seconds\n", elapsed_time);
-        printf("Encoded size: %zu", output_idx);
+        printf("Encoded size: %llu", output_idx);
 
         output_f = fopen(output_p, "wb");
         if(output_f == NULL)
@@ -269,9 +264,29 @@ int main(int argc, char** argv)
 
         start_time = clock();
 
-        printf("Original size: %zu\n", file_size);
+        printf("Original size: %llu\n", file_size);
         // Create path for output file
-        output_p = "decoded.txt";	// TODO: input name minus extension (if extension == .lz77)
+		int out_p_len = (int)(strlen(input_p) - strlen(EXTENSION));
+		if (out_p_len > 0)
+		{
+			char* should_be_extension = input_p + out_p_len;
+			if (strcmp(EXTENSION, should_be_extension) == 0)
+			{
+				output_p = malloc(out_p_len + 1);
+				strncpy(output_p, input_p, out_p_len);
+				output_p[out_p_len] = '\0';
+			}
+			else
+			{
+				fprintf(stderr, "|WRN| Input missing .lz77 extension, output will be 'decoded.txt'\n");
+				output_p = "decoded.txt";
+			}
+		}
+		else
+		{
+			fprintf(stderr, "|WRN| Input missing .lz77 extension, output will be 'decoded.txt'\n");
+			output_p = "decoded.txt";
+		}
 		
 		decode_state state = S_OFFSET;
         byte offset = 0;
@@ -297,16 +312,16 @@ int main(int argc, char** argv)
 					state = S_DATA;
 					break;
 				case S_DATA:
+					data = read;
 					// if needed, re-alloc output data array
 					if(output_idx > output_size - length - 1)
 					{
 						output_alloc_cnt += 1;
 						output_size = output_size*output_alloc_cnt;
 						output = (byte*)realloc(output, output_size);
-						printf("realloced\n");
 						if(output == NULL)
 						{
-							printf("|ERR| Failed to re-allocate (output) memory for: %zu Bytes\n", output_size*output_alloc_cnt);
+							printf("|ERR| Failed to re-allocate (output) memory for: %llu Bytes\n", output_size*output_alloc_cnt);
 							free(input);
 							free(output);
 							free(output_p);
@@ -324,7 +339,7 @@ int main(int argc, char** argv)
 							output[output_idx++] = output[i];
 						}
 					}
-					output[output_idx++] = read;
+					output[output_idx++] = data;
 					length = 0;
 					offset = 0;
 					state = S_OFFSET;					
@@ -348,7 +363,7 @@ int main(int argc, char** argv)
         end_time = clock();
         elapsed_time = ((double) (end_time - start_time)) / CLOCKS_PER_SEC;
         printf("Time elapsed: %0.2f seconds\n", elapsed_time);
-        printf("Decoded size: %zu", output_idx);
+        printf("Decoded size: %llu", output_idx);
 		
 		output_f = fopen(output_p, "wb");
         if(output_f == NULL)
@@ -360,7 +375,7 @@ int main(int argc, char** argv)
             return 1;
         }
 
-        size_t written = fwrite(output, 1, output_idx, output_f);
+        fwrite(output, 1, output_idx, output_f);
     }
 
     fclose(output_f);
